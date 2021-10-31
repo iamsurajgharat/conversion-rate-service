@@ -10,6 +10,7 @@ scalaVersion := "2.13.6"
 libraryDependencies += guice
 libraryDependencies += "org.scalatestplus.play" %% "scalatestplus-play" % "5.0.0" % Test
 libraryDependencies += "com.github.nscala-time" %% "nscala-time" % "2.30.0"
+libraryDependencies += "dev.zio" %% "zio" % "2.0.0-M4"
 
 // Adds additional packages into Twirl
 //TwirlKeys.templateImports += "com.surajgharat.controllers._"
