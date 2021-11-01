@@ -5,48 +5,50 @@ import com.surajgharat.conversionrates.models.ConversionRate
 import zio.Task
 import zio.ZIO
 import zio.RIO
+import zio.ULayer
 import play.api.libs.json.Json
 import com.google.inject.ImplementedBy
 import com.google.inject
+import zio.Has
+import zio.ZLayer
+
+@ImplementedBy(classOf[TestRateRepository])
+trait Repository {
+    import Repository._
+    def getAllRates():Task[List[SavedConversionRate]]
+    def getRates(source: Set[String], target:Set[String]): Task[List[SavedConversionRate]]
+    def getRatesBySource(source:String):Task[List[SavedConversionRate]]
+    def getRatesByTarget(target:String):Task[List[SavedConversionRate]]
+    def saveRates(rates:List[ConversionRate]):Task[List[SavedConversionRate]]
+    def deleteRates(ids:Set[Long]):Task[Unit]
+}
 
 object Repository{
+    import com.surajgharat.conversionrates.models.ConversionRate._
     case class SavedConversionRate(id:Long, rate:ConversionRate)
     implicit val savedRateFormat = Json.format[SavedConversionRate]
 
-    trait RateRepository{
-        def getAllRates():Task[List[SavedConversionRate]]
-        def getRates(source: Set[String], target:Set[String]): Task[List[SavedConversionRate]]
-        def getRatesBySource(source:String):Task[List[SavedConversionRate]]
-        def getRatesByTarget(target:String):Task[List[SavedConversionRate]]
-        def saveRates(rates:List[ConversionRate]):Task[List[SavedConversionRate]]
-        def deleteRates(ids:Set[Long]):Task[Unit]
-    }
+    def getAllRates():RIO[Has[Repository], List[SavedConversionRate]] = 
+        ZIO.serviceWith(_.getAllRates())
 
-    def getAllRates():RIO[RateRepository, List[SavedConversionRate]] = 
-        ZIO.accessZIO(_.getAllRates())
+    def getRates(source: Set[String], target:Set[String]):RIO[Has[Repository],List[SavedConversionRate]] = 
+        ZIO.serviceWith(_.getRates(source, target))
 
-    def getRates(source: Set[String], target:Set[String]):RIO[RateRepository,List[SavedConversionRate]] = 
-        ZIO.accessZIO(_.getRates(source, target))
+    def getRatesBySource(source:String):RIO[Has[Repository],List[SavedConversionRate]] = 
+        ZIO.serviceWith(_.getRatesBySource(source))
 
-    def getRatesBySource(source:String):RIO[RateRepository,List[SavedConversionRate]] = 
-        ZIO.accessZIO(_.getRatesBySource(source))
+    def getRatesByTarget(target:String):RIO[Has[Repository],List[SavedConversionRate]] = 
+        ZIO.serviceWith(_.getRatesByTarget(target))
 
-    def getRatesByTarget(target:String):RIO[RateRepository,List[SavedConversionRate]] = 
-        ZIO.accessZIO(_.getRatesByTarget(target))
+    def saveRates(rates:List[ConversionRate]):RIO[Has[Repository], List[SavedConversionRate]] =
+        ZIO.serviceWith(_.saveRates(rates))
 
-    def saveRates(rates:List[ConversionRate]):RIO[RateRepository, List[SavedConversionRate]] =
-        ZIO.accessZIO(_.saveRates(rates))
-
-    def deleteRates(ids:Set[Long]):RIO[RateRepository, Unit] =
-        ZIO.accessZIO(_.deleteRates(ids))
+    def deleteRates(ids:Set[Long]):RIO[Has[Repository], Unit] =
+        ZIO.serviceWith(_.deleteRates(ids))
 }
 
-@ImplementedBy(classOf[TestReporsitory])
-trait Repository {
-    def rateRepository : Repository.RateRepository
-}
-
-class TestRateRepository extends Repository.RateRepository{
+@inject.Singleton
+case class TestRateRepository() extends Repository{
     import Repository._
     private var savedRates = Map.empty[Long,SavedConversionRate]
     private var nextId : Long = 0
@@ -98,11 +100,8 @@ class TestRateRepository extends Repository.RateRepository{
         println("New generated id :"+nextId)
         nextId
     }
-
 }
 
-@inject.Singleton
-class TestReporsitory extends Repository {
-    println("Test repo is getting created")
-    val rateRepository: Repository.RateRepository = new TestRateRepository
-}
+// object TestRateRepository {
+//     val layer: ULayer[Has[Repository]] = ZLayer.succeed(TestRateRepository())
+// }

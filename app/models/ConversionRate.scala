@@ -2,7 +2,7 @@ package com.surajgharat.conversionrates.models
 //import com.github.nscala_time.time.Imports._
 import play.api.libs.json._
 import org.joda.time.DateTime
-import com.surajgharat.conversionrates.repositories.Repository
+
 object ConversionRate {
   implicit val dateTimeWrites = new Writes[DateTime] {
     def writes(date: DateTime) = {

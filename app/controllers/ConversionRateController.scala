@@ -10,7 +10,7 @@ import com.github.nscala_time.time.Imports._
 import play.api.libs.json._
 import scala.concurrent.Future
 import org.joda.time
-import com.surajgharat.conversionrates.repositories.Repository
+import com.surajgharat.conversionrates.repositories._
 import zio.Task
 
 @Singleton
