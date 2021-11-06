@@ -1,4 +1,5 @@
-package controllers
+package com.surajgharat.conversionrates.controllers
+package tests
 
 import org.scalatestplus.play._
 import org.scalatestplus.play.guice._

@@ -1,17 +1,20 @@
 package com.surajgharat.conversionrates.controllers
-import play.api._
-import play.api.data._
-import play.api.data.Forms._
-import play.api.mvc._
-import javax.inject._
-import com.surajgharat.conversionrates.models._
-import com.surajgharat.conversionrates.services._
 import com.github.nscala_time.time.Imports._
-import play.api.libs.json._
-import scala.concurrent.Future
-import org.joda.time
+import com.surajgharat.conversionrates.models._
 import com.surajgharat.conversionrates.repositories._
-import zio.{Task,UIO,ZIO}
+import com.surajgharat.conversionrates.services._
+import org.joda.time
+import play.api._
+import play.api.data.Forms._
+import play.api.data._
+import play.api.libs.json._
+import play.api.mvc._
+import zio.Task
+import zio.UIO
+import zio.ZIO
+
+import javax.inject._
+import scala.concurrent.Future
 
 @Singleton
 class ConversionRateController @Inject() (
@@ -21,6 +24,7 @@ class ConversionRateController @Inject() (
         
     import ConversionRate._
     import Repository._
+    implicit val ec = controllerComponents.executionContext
     private val logger = Logger(getClass)
 
     def greet = Action { request =>
@@ -62,7 +66,7 @@ class ConversionRateController @Inject() (
             ((interpret _) compose actionFun)(request)
         }
     }
-    
+
     def zioActionWithBody(actionFun : Request[JsValue] => UIO[Result]):Action[JsValue] = {
         Action(parse.json) { request =>
             ((interpret _) compose actionFun)(request)
