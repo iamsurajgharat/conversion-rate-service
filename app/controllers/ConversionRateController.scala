@@ -11,7 +11,7 @@ import play.api.libs.json._
 import scala.concurrent.Future
 import org.joda.time
 import com.surajgharat.conversionrates.repositories._
-import zio.Task
+import zio.{Task,UIO,ZIO}
 
 @Singleton
 class ConversionRateController @Inject() (
@@ -39,49 +39,37 @@ class ConversionRateController @Inject() (
         request.body.validate[List[ConversionRateRequest]].fold(error, success);
     }
 
-    def saveRates2() = Action(parse.json) { request: Request[JsValue] =>
-        def error(errors: scala.collection.Seq[(JsPath, scala.collection.Seq[JsonValidationError])]) = 
-            BadRequest(Json.obj("errors" -> JsError.toJson(errors)))
-
-        def success(request:List[ConversionRate]) : Result = {
-            //Ok(Json.toJson(request.map(r => ConversionRateResponse(r.source, r.target, r.date.getOrElse(time.DateTime.now()), 234))))
-            Ok(Json.toJson(List.empty[SavedConversionRate]))
-        }
-
-        request.body.validate[List[ConversionRate]].fold(error, success);
+    def getAllRates() = zioAction { _ =>
+        rateService.getAllRates().fold(handleInternalError, handleSuccess)
     }
 
-    def getAllRates() = action { () =>
-        rateService.getAllRates()
-    }
-
-    def saveRates() = postAction { request => 
-        def error(errors: scala.collection.Seq[(JsPath, scala.collection.Seq[JsonValidationError])]) = 
-            Task.fail(new Exception("Input parding issue"))
-
-        def success(rates:List[ConversionRate]) : Task[List[SavedConversionRate]] = 
-            rateService.saveRates(rates)
-
-        request.body.validate[List[ConversionRate]].fold(error, success)
-    }
-
-    def postAction(actionFun : Request[JsValue] => Task[List[SavedConversionRate]]):Action[JsValue] = {
-        def interpret(effect: Task[List[SavedConversionRate]]):Result = {
-            Ok(Json.toJson(zio.Runtime.default.unsafeRunTask(effect)))
+    def saveRates() = zioActionWithBody { request => 
+        def validateError(errors: scala.collection.Seq[(JsPath, scala.collection.Seq[JsonValidationError])]) : UIO[Result] = {
+            val validationError = ZIO.attempt(Json.obj("errors" -> JsError.toJson(errors))).
+                orElse(ZIO.succeed(Json.obj("errors" -> "Error in parsing input")))
+            validationError.map(BadRequest(_))
         }
 
-        Action(parse.json){ request =>
-            interpret(actionFun(request))
-        }
-    }
-
-    def action(actionFun : () => Task[List[SavedConversionRate]]):Action[AnyContent] = {
-        def interpret(effect: Task[List[SavedConversionRate]]):Result = {
-            Ok(Json.toJson(zio.Runtime.default.unsafeRunTask(effect)))
+        def validateSuccess(rates:List[ConversionRate]) : UIO[Result] = {
+            rateService.saveRates(rates).fold(handleInternalError, handleSuccess)
         }
 
-        Action { _ =>
-            interpret(actionFun())
+        request.body.validate[List[ConversionRate]].fold(validateError, validateSuccess)
+    }
+
+    def zioAction(actionFun : Request[AnyContent] => UIO[Result]):Action[AnyContent] = {
+        Action { request =>
+            ((interpret _) compose actionFun)(request)
         }
     }
+    
+    def zioActionWithBody(actionFun : Request[JsValue] => UIO[Result]):Action[JsValue] = {
+        Action(parse.json) { request =>
+            ((interpret _) compose actionFun)(request)
+        }
+    }
+    
+    private def interpret(effect: UIO[Result]):Result = zio.Runtime.default.unsafeRunTask(effect)
+    private def handleInternalError(e:Throwable):Result = InternalServerError(e.getMessage())
+    private def handleSuccess(data:List[SavedConversionRate]):Result = Ok(Json.toJson(data))
 }
