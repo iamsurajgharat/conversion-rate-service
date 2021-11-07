@@ -12,6 +12,13 @@ libraryDependencies += "org.scalatestplus.play" %% "scalatestplus-play" % "5.0.0
 libraryDependencies += "com.github.nscala-time" %% "nscala-time" % "2.30.0"
 libraryDependencies += "dev.zio" %% "zio" % "2.0.0-M4"
 libraryDependencies += "org.mockito" %% "mockito-scala" % "1.16.46"
+libraryDependencies += jdbc
+libraryDependencies ++= Seq(
+  "com.typesafe.slick" %% "slick" % "3.3.3",
+ // "org.slf4j" % "slf4j-nop" % "1.6.4",
+  "com.typesafe.slick" %% "slick-hikaricp" % "3.3.3",
+  "org.postgresql" % "postgresql" % "9.4-1206-jdbc42"
+)
 
 // Adds additional packages into Twirl
 //TwirlKeys.templateImports += "com.surajgharat.controllers._"

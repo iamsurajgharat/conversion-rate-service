@@ -11,8 +11,11 @@ import com.google.inject.ImplementedBy
 import com.google.inject
 import zio.Has
 import zio.ZLayer
+import play.api.db.Database
+import javax.inject.Inject
+import com.surajgharat.conversionrates.repositories.rateRepositoryLive._
 
-@ImplementedBy(classOf[TestRateRepository])
+@ImplementedBy(classOf[SlickRateRepository])
 trait Repository {
     import Repository._
     def getAllRates():Task[List[SavedConversionRate]]

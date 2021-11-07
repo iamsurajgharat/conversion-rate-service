@@ -1,15 +1,18 @@
 package com.surajgharat.conversionrates.services
-import org.joda.time.DateTime
+import com.google.inject
+import com.google.inject.ImplementedBy
+import com.google.inject.Inject
 import com.surajgharat.conversionrates.models._
 import com.surajgharat.conversionrates.repositories._
-import Repository._
-import zio.Task
-import com.google.inject.Inject
-import com.google.inject.ImplementedBy
-import com.google.inject
-import zio.ZLayer
-import zio.ULayer
+import org.joda.time.DateTime
 import zio.Has
+import zio.RIO
+import zio.Task
+import zio.ULayer
+import zio.ZIO
+import zio.ZLayer
+
+import Repository._
 
 @ImplementedBy(classOf[ConversionRateServiceImpl])
 trait ConversionRateService{
