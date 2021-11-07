@@ -5,7 +5,7 @@ import akka.http.scaladsl.model.HttpHeader
 import akka.stream.Materializer
 import com.surajgharat.conversionrates.models.ConversionRate
 import com.surajgharat.conversionrates.repositories.Repository
-import com.surajgharat.conversionrates.services.ConversionRateServiceSpec
+import com.surajgharat.conversionrates.services.ConversionRateService
 import org.joda.time.DateTime
 import org.mockito.ArgumentMatchersSugar
 import org.mockito.MockSettings
@@ -29,7 +29,7 @@ class ConversionRateControllerSpec extends PlaySpec with GuiceOneAppPerSuite wit
     import Helpers._
     import Repository._
     "getAllRates" must{
-        val rateServiceMock = mock[ConversionRateServiceSpec]
+        val rateServiceMock = mock[ConversionRateService]
         val subject = new ConversionRateController(rateServiceMock, Helpers.stubControllerComponents())
         "return list of saved rates" in {
             // mock result data
@@ -70,7 +70,7 @@ class ConversionRateControllerSpec extends PlaySpec with GuiceOneAppPerSuite wit
     }
 
     "saveRates" must{
-        val rateServiceMock = mock[ConversionRateServiceSpec]
+        val rateServiceMock = mock[ConversionRateService]
         val subject = new ConversionRateController(rateServiceMock, Helpers.stubControllerComponents())
 
         "return savedRates for provided rates" in {

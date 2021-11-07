@@ -11,14 +11,14 @@ import zio.ZLayer
 import zio.ULayer
 import zio.Has
 
-@ImplementedBy(classOf[ConversionRateService])
-trait ConversionRateServiceSpec{
+@ImplementedBy(classOf[ConversionRateServiceImpl])
+trait ConversionRateService{
     def saveRates(rates:List[ConversionRate]): Task[List[SavedConversionRate]]
     def getAllRates(): Task[List[SavedConversionRate]]
 }
 
 @inject.Singleton
-class ConversionRateService @Inject() (repository:Repository) extends ConversionRateServiceSpec{
+class ConversionRateServiceImpl @Inject() (repository:Repository) extends ConversionRateService{
     val repoLayer: ULayer[Has[Repository]] = ZLayer.succeed(repository)
     def saveRates(rates: List[ConversionRate]): Task[List[SavedConversionRate]] = 
         Repository.saveRates(rates).provideLayer(repoLayer)

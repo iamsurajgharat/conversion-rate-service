@@ -18,7 +18,7 @@ import scala.concurrent.Future
 
 @Singleton
 class ConversionRateController @Inject() (
-        val rateService: ConversionRateServiceSpec,
+        val rateService: ConversionRateService,
         val controllerComponents: ControllerComponents
     ) extends BaseController {
         
