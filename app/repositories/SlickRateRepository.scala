@@ -5,14 +5,16 @@ import com.surajgharat.conversionrates.repositories.Repository
 import javax.inject._
 import zio.{ZIO,Task}
 import com.surajgharat.conversionrates.models._
-import java.time.LocalDate
+import org.joda.time.DateTime
 import scala.concurrent.Future
-
+import org.joda.time.DateTimeZone
+//import slick.jdbc.PostgresProfile.api._
 
 object rateRepositoryLive {
     
     import slick.jdbc.PostgresProfile.api._
     import scala.concurrent.ExecutionContext.Implicits.global
+    import com.github.tototoshi.slick.PostgresJodaSupport._
 
     class SlickRateRepository() extends Repository {
         
@@ -36,7 +38,7 @@ object rateRepositoryLive {
         private def convert(rate:SavedConversionRate2):Repository.SavedConversionRate = {
             Repository.SavedConversionRate(rate.id.get, 
                 ConversionRate(rate.source, rate.target, new org.joda.time.DateTime(),
-                new org.joda.time.DateTime(), rate.value, Some(rate.id.get)))
+                new DateTime(), rate.value, Some(rate.id.get)))
         }
         
     }
@@ -45,8 +47,8 @@ object rateRepositoryLive {
         id:Option[Int],
         source:String,
         target:String,
-        fromDate:Option[LocalDate],
-        toDate:Option[LocalDate],
+        fromDate:Option[DateTime],
+        toDate:Option[DateTime],
         value:Float
         )
 
@@ -54,8 +56,8 @@ object rateRepositoryLive {
         def id = column[Int]("id", O.PrimaryKey, O.AutoInc)
         def source = column[String]("source")
         def target = column[String]("target")
-        def fromDate = column[Option[LocalDate]]("fromdate")
-        def toDate = column[Option[LocalDate]]("todate")
+        def fromDate = column[Option[DateTime]]("fromdate")
+        def toDate = column[Option[DateTime]]("todate")
         def value = column[Float]("value")
         override def * = (id.?, source, target, fromDate, toDate, value) <> (SavedConversionRate2.tupled, SavedConversionRate2.unapply)
     }

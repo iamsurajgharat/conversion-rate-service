@@ -19,6 +19,8 @@ libraryDependencies ++= Seq(
   "com.typesafe.slick" %% "slick-hikaricp" % "3.3.3",
   "org.postgresql" % "postgresql" % "9.4-1206-jdbc42"
 )
+libraryDependencies += "com.github.tototoshi" %% "slick-joda-mapper" % "2.4.2"
+libraryDependencies += "org.joda" % "joda-convert" % "1.7"
 
 // Adds additional packages into Twirl
 //TwirlKeys.templateImports += "com.surajgharat.controllers._"
