@@ -52,5 +52,5 @@ case class ConversionRate(source: String,
     startDate: DateTime,
     endDate: DateTime,
     rate: Float,
-    id:Option[Long]
+    id:Option[Int]
     )

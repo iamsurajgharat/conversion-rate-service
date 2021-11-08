@@ -14,6 +14,7 @@ import zio.ZLayer
 import play.api.db.Database
 import javax.inject.Inject
 import com.surajgharat.conversionrates.repositories.rateRepositoryLive._
+import org.joda.time.DateTime
 
 @ImplementedBy(classOf[SlickRateRepository])
 trait Repository {
@@ -23,12 +24,20 @@ trait Repository {
     def getRatesBySource(source:String):Task[List[SavedConversionRate]]
     def getRatesByTarget(target:String):Task[List[SavedConversionRate]]
     def saveRates(rates:List[ConversionRate]):Task[List[SavedConversionRate]]
-    def deleteRates(ids:Set[Long]):Task[Unit]
+    def deleteRates(ids:Set[Int]):Task[Unit]
 }
 
 object Repository{
     import com.surajgharat.conversionrates.models.ConversionRate._
-    case class SavedConversionRate(id:Long, rate:ConversionRate)
+    case class SavedConversionRate(
+        id:Option[Int],
+        source:String,
+        target:String,
+        fromDate:DateTime,
+        toDate:DateTime,
+        value:Float
+    )
+
     implicit val savedRateFormat = Json.format[SavedConversionRate]
 
     def getAllRates():RIO[Has[Repository], List[SavedConversionRate]] = 
@@ -46,34 +55,34 @@ object Repository{
     def saveRates(rates:List[ConversionRate]):RIO[Has[Repository], List[SavedConversionRate]] =
         ZIO.serviceWith(_.saveRates(rates))
 
-    def deleteRates(ids:Set[Long]):RIO[Has[Repository], Unit] =
+    def deleteRates(ids:Set[Int]):RIO[Has[Repository], Unit] =
         ZIO.serviceWith(_.deleteRates(ids))
 }
 
 @inject.Singleton
 case class TestRateRepository() extends Repository{
     import Repository._
-    private var savedRates = Map.empty[Long,SavedConversionRate]
-    private var nextId : Long = 0
+    private var savedRates = Map.empty[Int,SavedConversionRate]
+    private var nextId : Int = 0
     
     def getAllRates(): Task[List[SavedConversionRate]] = 
         Task.succeed(savedRates.view.map(_._2).toList.sortBy(_.id))
 
     def getRatesBySource(source: String): Task[List[SavedConversionRate]] = {
-        Task.succeed(savedRates.withFilter(_._2.rate.source == source).map(_._2).toList)
+        Task.succeed(savedRates.withFilter(_._2.source == source).map(_._2).toList)
     }
 
     def getRates(source: Set[String], target:Set[String]): Task[List[SavedConversionRate]] = {
         Task.succeed(savedRates.withFilter(r => 
-            source.contains(r._2.rate.source) && 
-            target.contains(r._2.rate.target)).map(_._2).toList)
+            source.contains(r._2.source) && 
+            target.contains(r._2.target)).map(_._2).toList)
     }
 
     def getRatesByTarget(target: String): Task[List[SavedConversionRate]] = {
-        Task.succeed(savedRates.withFilter(_._2.rate.target == target).map(_._2).toList)
+        Task.succeed(savedRates.withFilter(_._2.target == target).map(_._2).toList)
     }
 
-    def deleteRates(ids: Set[Long]): Task[Unit] = {    
+    def deleteRates(ids: Set[Int]): Task[Unit] = {    
         savedRates = savedRates.removedAll(ids)
         Task.succeed(())
     }
@@ -83,7 +92,7 @@ case class TestRateRepository() extends Repository{
         else{
             val (first :: rest) = rates
             val savedRate = saveRate(first)
-            savedRates = savedRates + (savedRate.id -> savedRate)
+            savedRates = savedRates + (savedRate.id.get -> savedRate)
             saveRates(rest).map(savedRate :: _)
         }
     }
@@ -97,8 +106,10 @@ case class TestRateRepository() extends Repository{
         }
     }
 
-    private def createSavedRate(id:Long, rate: ConversionRate) = SavedConversionRate(id, rate)
-    private def getNextId():Long = {
+    private def createSavedRate(id:Int, rate: ConversionRate) = 
+        SavedConversionRate(Some(id), rate.source, rate.target, rate.startDate, rate.endDate, rate.rate)
+
+    private def getNextId():Int = {
         nextId = nextId + 1;
         println("New generated id :"+nextId)
         nextId
