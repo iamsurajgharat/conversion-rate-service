@@ -3,12 +3,12 @@ organization := "com.surajgharat"
 
 version := "1.0-SNAPSHOT"
 
-lazy val databaseUrl = sys.env.getOrElse("DB_DEFAULT_URL", "jdbc:postgresql:./localhost:5432")
+lazy val databaseUrl = sys.env.getOrElse("DB_DEFAULT_URL", "jdbc:postgresql://localhost:5432/postgres")
 lazy val databaseUser = sys.env.getOrElse("DB_DEFAULT_USER", "postgres")
 lazy val databasePassword = sys.env.getOrElse("DB_DEFAULT_PASSWORD", "postgres")
 
 scalaVersion := "2.13.6"
-val FlywayVersion = "6.2.2"
+val FlywayVersion = "8.0.4"
 
 lazy val root = (project in file("."))
   .enablePlugins(PlayScala)
@@ -29,7 +29,7 @@ lazy val root = (project in file("."))
       "org.joda" % "joda-convert" % "1.7",
       "org.flywaydb" % "flyway-core" % FlywayVersion
     ),
-    flywayLocations := Seq("classpath:db/migration"),
+    flywayLocations := Seq("filesystem:app/resources/db/migration"),
     flywayUrl := databaseUrl,
     flywayUser := databaseUser,
     flywayPassword := databasePassword,
