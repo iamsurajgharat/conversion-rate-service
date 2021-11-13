@@ -20,10 +20,8 @@ import org.joda.time.DateTime
 trait Repository {
     import Repository._
     def getAllRates():Task[List[SavedConversionRate]]
-    def getRates(source: Set[String], target:Set[String]): Task[List[SavedConversionRate]]
-    def getRatesBySource(source:String):Task[List[SavedConversionRate]]
-    def getRatesByTarget(target:String):Task[List[SavedConversionRate]]
-    def saveRates(rates:List[ConversionRate]):Task[List[SavedConversionRate]]
+    def getRatesByTarget(units:Set[String]):Task[Seq[SavedConversionRate]]
+    def saveRates(rates:List[SavedConversionRate]):Task[List[SavedConversionRate]]
     def deleteRates(ids:Set[Int]):Task[Unit]
 }
 
@@ -36,23 +34,19 @@ object Repository{
         fromDate:DateTime,
         toDate:DateTime,
         value:Float
-    )
+    ){
+        def overlap(that:SavedConversionRate):Boolean = false
+    }
 
     implicit val savedRateFormat = Json.format[SavedConversionRate]
 
     def getAllRates():RIO[Has[Repository], List[SavedConversionRate]] = 
         ZIO.serviceWith(_.getAllRates())
 
-    def getRates(source: Set[String], target:Set[String]):RIO[Has[Repository],List[SavedConversionRate]] = 
-        ZIO.serviceWith(_.getRates(source, target))
+    def getRatesByTarget(units:Set[String]):RIO[Has[Repository],Seq[SavedConversionRate]] = 
+        ZIO.serviceWith(_.getRatesByTarget(units))
 
-    def getRatesBySource(source:String):RIO[Has[Repository],List[SavedConversionRate]] = 
-        ZIO.serviceWith(_.getRatesBySource(source))
-
-    def getRatesByTarget(target:String):RIO[Has[Repository],List[SavedConversionRate]] = 
-        ZIO.serviceWith(_.getRatesByTarget(target))
-
-    def saveRates(rates:List[ConversionRate]):RIO[Has[Repository], List[SavedConversionRate]] =
+    def saveRates(rates:List[SavedConversionRate]):RIO[Has[Repository], List[SavedConversionRate]] =
         ZIO.serviceWith(_.saveRates(rates))
 
     def deleteRates(ids:Set[Int]):RIO[Has[Repository], Unit] =
@@ -68,26 +62,14 @@ case class TestRateRepository() extends Repository{
     def getAllRates(): Task[List[SavedConversionRate]] = 
         Task.succeed(savedRates.view.map(_._2).toList.sortBy(_.id))
 
-    def getRatesBySource(source: String): Task[List[SavedConversionRate]] = {
-        Task.succeed(savedRates.withFilter(_._2.source == source).map(_._2).toList)
-    }
-
-    def getRates(source: Set[String], target:Set[String]): Task[List[SavedConversionRate]] = {
-        Task.succeed(savedRates.withFilter(r => 
-            source.contains(r._2.source) && 
-            target.contains(r._2.target)).map(_._2).toList)
-    }
-
-    def getRatesByTarget(target: String): Task[List[SavedConversionRate]] = {
-        Task.succeed(savedRates.withFilter(_._2.target == target).map(_._2).toList)
-    }
+    def getRatesByTarget(units:Set[String]):Task[Seq[SavedConversionRate]] = ???
 
     def deleteRates(ids: Set[Int]): Task[Unit] = {    
         savedRates = savedRates.removedAll(ids)
         Task.succeed(())
     }
 
-    def saveRates(rates: List[ConversionRate]): Task[List[SavedConversionRate]] = {
+    def saveRates(rates: List[SavedConversionRate]): Task[List[SavedConversionRate]] = {
         if(rates.isEmpty) Task.succeed(List.empty[SavedConversionRate])
         else{
             val (first :: rest) = rates
@@ -97,7 +79,7 @@ case class TestRateRepository() extends Repository{
         }
     }
 
-    private def saveRate(rate:ConversionRate):SavedConversionRate = {
+    private def saveRate(rate:SavedConversionRate):SavedConversionRate = {
         rate.id match {
             case None => 
                 createSavedRate(getNextId(), rate)
@@ -106,8 +88,8 @@ case class TestRateRepository() extends Repository{
         }
     }
 
-    private def createSavedRate(id:Int, rate: ConversionRate) = 
-        SavedConversionRate(Some(id), rate.source, rate.target, rate.startDate, rate.endDate, rate.rate)
+    private def createSavedRate(id:Int, rate: SavedConversionRate) = 
+        SavedConversionRate(Some(id), rate.source, rate.target, rate.fromDate, rate.toDate, rate.value)
 
     private def getNextId():Int = {
         nextId = nextId + 1;

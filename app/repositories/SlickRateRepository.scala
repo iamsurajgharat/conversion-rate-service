@@ -18,21 +18,40 @@ object rateRepositoryLive {
 
     class SlickRateRepository() extends Repository {
         
-        def getAllRates(): Task[List[Repository.SavedConversionRate]] = {
+        def getAllRates(): Task[List[SavedConversionRate]] = {
             ZIO.fromFuture(ec => {
-                val query = rates.sortBy(_.id).result
+                val query = ratesFromDB.sortBy(_.id).result
                 db.run(query).map(_.toList)
             });
         }
+
+        def getRatesByTarget(units:Set[String]):Task[Seq[SavedConversionRate]] = {
+            ZIO.fromFuture(ec => {
+                val query = ratesFromDB.filter(x => x.target.inSet(units))
+                db.run(query.result)
+            })
+        }
         
-        def getRates(source: Set[String], target: Set[String]): Task[List[Repository.SavedConversionRate]] = ???
-        
-        def getRatesBySource(source: String): Task[List[Repository.SavedConversionRate]] = ???
-        
-        def getRatesByTarget(target: String): Task[List[Repository.SavedConversionRate]] = ???
-        
-        def saveRates(rates: List[ConversionRate]): Task[List[Repository.SavedConversionRate]] = ???
-        
+        def saveRates(rates: List[SavedConversionRate]): Task[List[SavedConversionRate]] = {
+            val (addOnes, updateOnes) = rates.partition(_.id == None)
+            val insertWithIdedRateReturn = (ratesFromDB returning ratesFromDB.map(_.id) into ((rate, id) => rate.copy(id=Some(id))))
+            val insertAct = insertWithIdedRateReturn ++= addOnes
+            val updateAct = DBIO.sequence(updateOnes.map(rate => TableQuery[ConversionRates].update(rate)))
+            
+            // val f2 = db.run(insertWithIdedRateReturn ++= addOnes)
+            // val toBeInserted = rates.map { row => TableQuery[ConversionRates].insertOrUpdate(row) }
+            // val inOneGo = DBIO.sequence(toBeInserted)
+            // val dbioFuture = db.run(inOneGo)
+            
+            ZIO.fromFuture(ec => {
+                for{
+                    addedRate <- db.run(insertAct)
+                    _ <- db.run(updateAct)
+                } yield (addedRate.toList ++ updateOnes).sortBy(_.id.getOrElse(0))
+            })
+            
+        }
+
         def deleteRates(ids: Set[Int]): Task[Unit] = ???
     }
 
@@ -46,6 +65,6 @@ object rateRepositoryLive {
         override def * = (id.?, source, target, fromDate, toDate, value) <> (SavedConversionRate.tupled, SavedConversionRate.unapply)
     }
 
-    val rates = TableQuery[ConversionRates]
+    val ratesFromDB = TableQuery[ConversionRates]
     val db = Database.forConfig("mydb")
 }

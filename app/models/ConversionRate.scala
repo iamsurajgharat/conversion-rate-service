@@ -2,6 +2,7 @@ package com.surajgharat.conversionrates.models
 //import com.github.nscala_time.time.Imports._
 import play.api.libs.json._
 import org.joda.time.DateTime
+import com.surajgharat.conversionrates.repositories.Repository
 
 object ConversionRate {
   implicit val dateTimeWrites = new Writes[DateTime] {
@@ -49,8 +50,11 @@ case class ConversionRateResponse(
 
 case class ConversionRate(source: String,
     target: String,
-    startDate: DateTime,
-    endDate: DateTime,
+    startDate: Option[DateTime],
+    endDate: Option[DateTime],
     rate: Float,
     id:Option[Int]
-    )
+    ){
+      def toSavedRate(sd:DateTime, ed:DateTime):Repository.SavedConversionRate = 
+        Repository.SavedConversionRate(id, source, target, startDate.getOrElse(sd), endDate.getOrElse(ed), rate)
+    }
