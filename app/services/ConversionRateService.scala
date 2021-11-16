@@ -42,12 +42,14 @@ class ConversionRateServiceImpl @Inject() (repository:Repository) extends Conver
 
     private def validateRate(rates: List[ConversionRate], 
         savedRates:Seq[SavedConversionRate]):IO[ValidationException, List[SavedConversionRate]] = {
-        val savedRatesByTarget = savedRates.groupBy(_.target)
+        val updatedSavedRates = getUpdateSavedRates(rates, savedRates)
+        val savedRatesByTarget = updatedSavedRates.groupBy(_.target)
         val validInvalidRates = rates.map(_.toSavedRate(defaultStartDate, defaultEndDate))
             .zipWithIndex
             .partition(newRate => {
-            savedRatesByTarget.get(newRate._1.target).getOrElse(Nil).exists(_.overlap(newRate._1))
+            savedRatesByTarget.get(newRate._1.target).getOrElse(Nil).view.exists(sr => (newRate._1.id == None ||(newRate._1.id.get != sr.id.get)) && sr.overlap(newRate._1))
         })
+
         if(validInvalidRates._1.isEmpty){
             val validRates = validInvalidRates._2.map(_._1)
             ZIO.succeed(validRates)
@@ -57,6 +59,20 @@ class ConversionRateServiceImpl @Inject() (repository:Repository) extends Conver
             val message = s"Overlapping rates [${invalidIndices.mkString(",")}]"
             ZIO.fail(new ValidationException(message))
         }
+    }
+
+    private def getUpdateSavedRates(rates:List[ConversionRate], savedRates:Seq[SavedConversionRate]):List[SavedConversionRate] = {
+        val rateById = rates.view.filter(_.id != None).foldLeft(Map.empty[Int,ConversionRate])((m,r) => m + (r.id.get -> r))
+        var updatedSavedRates = List.empty[SavedConversionRate]
+        for(savedRate <- savedRates){
+            if(rateById.contains(savedRate.id.get)){
+                updatedSavedRates = rateById(savedRate.id.get).toSavedRate(defaultStartDate, defaultEndDate) :: updatedSavedRates
+            }
+            else{
+                updatedSavedRates = savedRate :: updatedSavedRates
+            }
+        }
+        updatedSavedRates
     }
         
 }

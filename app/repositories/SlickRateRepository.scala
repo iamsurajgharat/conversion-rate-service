@@ -36,12 +36,8 @@ object rateRepositoryLive {
             val (addOnes, updateOnes) = rates.partition(_.id == None)
             val insertWithIdedRateReturn = (ratesFromDB returning ratesFromDB.map(_.id) into ((rate, id) => rate.copy(id=Some(id))))
             val insertAct = insertWithIdedRateReturn ++= addOnes
-            val updateAct = DBIO.sequence(updateOnes.map(rate => TableQuery[ConversionRates].update(rate)))
-            
-            // val f2 = db.run(insertWithIdedRateReturn ++= addOnes)
-            // val toBeInserted = rates.map { row => TableQuery[ConversionRates].insertOrUpdate(row) }
-            // val inOneGo = DBIO.sequence(toBeInserted)
-            // val dbioFuture = db.run(inOneGo)
+            val updateAct = DBIO.sequence(updateOnes.map(row => ratesFromDB.filter(_.id === row.id).update(row)))
+            println("update request :"+updateOnes)
             
             ZIO.fromFuture(ec => {
                 for{

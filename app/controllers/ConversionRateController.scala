@@ -74,6 +74,9 @@ class ConversionRateController @Inject() (
     }
     
     private def interpret(effect: UIO[Result]):Result = zio.Runtime.default.unsafeRunTask(effect)
-    private def handleInternalError(e:Throwable):Result = InternalServerError(e.getMessage())
+    private def handleInternalError(e:Throwable):Result = e match {
+        case _ : ValidationException => BadRequest(e.getMessage())
+        case _ => InternalServerError(e.getMessage())
+    }
     private def handleSuccess(data:List[SavedConversionRate]):Result = Ok(Json.toJson(data))
 }
