@@ -74,7 +74,6 @@ class ConversionRateServiceImpl @Inject() (repository:Repository) extends Conver
         }
         updatedSavedRates
     }
-        
 }
 
 case class ValidationException(message:String) extends Exception(message)

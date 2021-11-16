@@ -23,6 +23,7 @@ import play.api.mvc.Request
 import play.api.test.FakeRequest
 import play.api.test.Helpers
 import zio.ZIO
+import com.surajgharat.conversionrates.services.ValidationException
 
 class ConversionRateControllerSpec extends PlaySpec with GuiceOneAppPerSuite with MockitoSugar with ArgumentMatchersSugar{
 
@@ -82,7 +83,9 @@ class ConversionRateControllerSpec extends PlaySpec with GuiceOneAppPerSuite wit
             // mock result data
             when(rateServiceMock.saveRates(any[List[ConversionRate]])).
                 thenReturn(
-                    ZIO.succeed(List(SavedConversionRate(1, rates.head)))
+                    ZIO.succeed(
+                    List(
+                        SavedConversionRate(Some(1), rates.head.source, rates.head.target, new DateTime(2021,1,1,0,0,0), new DateTime(2021,1,31,0,0,0), 45)))
                 )
 
             // act
@@ -93,7 +96,7 @@ class ConversionRateControllerSpec extends PlaySpec with GuiceOneAppPerSuite wit
             val jsValue = Json.parse(contentAsString(result))
             jsValue.validate[List[SavedConversionRate]] match {
                 case JsSuccess(data, _) =>
-                    data.head.rate.source mustBe rates.head.source
+                    data.head.source mustBe rates.head.source
                 case _:JsError => 
                     fail("Invalid json in result ")
             }
@@ -121,7 +124,30 @@ class ConversionRateControllerSpec extends PlaySpec with GuiceOneAppPerSuite wit
             reset(rateServiceMock)
         }
 
-        "return internalServerError when service fals" in {
+        "return BadRequest when service throws validation error" in {
+            // arrange
+            val rates = List(getSampleRate())
+            var json = Json.toJson(rates)
+            val request = FakeRequest(GET, "/rates/save", Headers.create(), json)
+
+            // mock result data
+            when(rateServiceMock.saveRates(any[List[ConversionRate]])).
+                thenReturn(
+                    ZIO.fail(new ValidationException("Overalpping rates"))
+                )
+
+            // act
+            val result = subject.saveRates().apply(request)
+
+            // assure
+            status(result) mustBe BAD_REQUEST
+            contentAsString(result) mustBe "Overalpping rates"
+
+            // reset mock
+            reset(rateServiceMock)
+        }
+
+        "return internalServerError when service fails" in {
             // arrange
             val rates = List(getSampleRate())
             var json = Json.toJson(rates)
@@ -146,10 +172,10 @@ class ConversionRateControllerSpec extends PlaySpec with GuiceOneAppPerSuite wit
     }
 
     private def getSampleSavedRate() : SavedConversionRate = {
-        SavedConversionRate(1, getSampleRate())
+        SavedConversionRate(Some(1), "Kg", "Gm", new DateTime(), new DateTime(), 1000)
     }
 
     private def getSampleRate() : ConversionRate = {
-        ConversionRate("Kg", "Gm", new DateTime(), new DateTime(), 1000, None)
+        ConversionRate("Kg", "Gm", Some(new DateTime()), Some(new DateTime()), 1000, None)
     }
 }
