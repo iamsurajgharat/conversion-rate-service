@@ -3,6 +3,7 @@ import com.github.nscala_time.time.Imports._
 import com.surajgharat.conversionrates.models._
 import com.surajgharat.conversionrates.repositories._
 import com.surajgharat.conversionrates.services._
+import com.surajgharat.conversionrates.helpers._
 import org.joda.time
 import play.api._
 import play.api.data.Forms._
@@ -24,6 +25,7 @@ class ConversionRateController @Inject() (
         
     import ConversionRate._
     import Repository._
+    import ZIOHelper._
     implicit val ec = controllerComponents.executionContext
     private val logger = Logger(getClass)
 
@@ -63,17 +65,17 @@ class ConversionRateController @Inject() (
 
     def zioAction(actionFun : Request[AnyContent] => UIO[Result]):Action[AnyContent] = {
         Action { request =>
-            ((interpret _) compose actionFun)(request)
+            ((interpret[Result] _) compose actionFun)(request)
         }
     }
 
     def zioActionWithBody(actionFun : Request[JsValue] => UIO[Result]):Action[JsValue] = {
         Action(parse.json) { request =>
-            ((interpret _) compose actionFun)(request)
+            ((interpret[Result] _) compose actionFun)(request)
         }
     }
     
-    private def interpret(effect: UIO[Result]):Result = zio.Runtime.default.unsafeRunTask(effect)
+    //private def interpret(effect: UIO[Result]):Result = zio.Runtime.default.unsafeRunTask(effect)
     private def handleInternalError(e:Throwable):Result = e match {
         case _ : ValidationException => BadRequest(e.getMessage())
         case _ => InternalServerError(e.getMessage())
