@@ -20,8 +20,6 @@ lazy val root = (project in file("."))
       "org.scalatestplus.play" %% "scalatestplus-play" % "5.0.0" % Test,
       "com.github.nscala-time" %% "nscala-time" % "2.30.0",
       "dev.zio" %% "zio" % zioVersion,
-      "dev.zio" %% "zio-test"          % zioVersion % "test",
-      "dev.zio" %% "zio-test-sbt"      % zioVersion % "test",
       "org.mockito" %% "mockito-scala" % "1.16.46",
       jdbc,
       "com.typesafe.slick" %% "slick" % "3.3.3",

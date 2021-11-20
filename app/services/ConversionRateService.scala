@@ -21,11 +21,14 @@ trait ConversionRateService{
     def getAllRates(): Task[List[SavedConversionRate]]
 }
 
+object ConversionRateService{
+    val defaultStartDate = new DateTime(1, 1, 1, 0, 0)
+    val defaultEndDate = new DateTime(4000, 12, 31, 0, 0)
+}
+
 @inject.Singleton
 class ConversionRateServiceImpl @Inject() (repository:Repository) extends ConversionRateService{
     val repoLayer: ULayer[Has[Repository]] = ZLayer.succeed(repository)
-    val defaultStartDate = new DateTime(1, 1, 1, 0, 0)
-    val defaultEndDate = new DateTime(4000, 12, 31, 0, 0)
     def saveRates(rates: List[ConversionRate]): Task[List[SavedConversionRate]] = {
         // find overlaps if any
         val savedRatesEffect = for{
@@ -44,7 +47,7 @@ class ConversionRateServiceImpl @Inject() (repository:Repository) extends Conver
         savedRates:Seq[SavedConversionRate]):IO[ValidationException, List[SavedConversionRate]] = {
         val updatedSavedRates = getUpdateSavedRates(rates, savedRates)
         val savedRatesByTarget = updatedSavedRates.groupBy(_.target)
-        val validInvalidRates = rates.map(_.toSavedRate(defaultStartDate, defaultEndDate))
+        val validInvalidRates = rates.map(_.toSavedRate(ConversionRateService.defaultStartDate, ConversionRateService.defaultEndDate))
             .zipWithIndex
             .partition(newRate => {
             savedRatesByTarget.get(newRate._1.target).getOrElse(Nil).view.exists(sr => (newRate._1.id == None ||(newRate._1.id.get != sr.id.get)) && sr.overlap(newRate._1))
@@ -66,7 +69,7 @@ class ConversionRateServiceImpl @Inject() (repository:Repository) extends Conver
         var updatedSavedRates = List.empty[SavedConversionRate]
         for(savedRate <- savedRates){
             if(rateById.contains(savedRate.id.get)){
-                updatedSavedRates = rateById(savedRate.id.get).toSavedRate(defaultStartDate, defaultEndDate) :: updatedSavedRates
+                updatedSavedRates = rateById(savedRate.id.get).toSavedRate(ConversionRateService.defaultStartDate, ConversionRateService.defaultEndDate) :: updatedSavedRates
             }
             else{
                 updatedSavedRates = savedRate :: updatedSavedRates

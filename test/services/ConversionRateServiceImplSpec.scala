@@ -1,45 +1,28 @@
 package com.surajgharat.conversionrates.services
 package tests
 
-import org.mockito.MockitoSugar
-import play.api.test.Helpers
+import com.surajgharat.conversionrates.helpers._
 import com.surajgharat.conversionrates.repositories.Repository
 import com.surajgharat.conversionrates.services.ConversionRateService
-import zio.ZIO
-import zio.test.DefaultRunnableSpec
-import zio.test.Assertion._
-import zio.test._
-import zio.test.environment._
-import org.scalatestplus.play.guice.GuiceOneAppPerSuite
-import org.mockito.ArgumentMatchersSugar
-import org.scalatestplus.play.PlaySpec
 import org.joda.time.DateTime
-import com.surajgharat.conversionrates.helpers._
+import org.mockito.ArgumentMatchersSugar
+import org.mockito.MockitoSugar
+import org.scalatestplus.play.PlaySpec
+import org.scalatestplus.play.guice.GuiceOneAppPerSuite
+import play.api.test.Helpers
+import zio.ZIO
+import com.surajgharat.conversionrates.models.ConversionRate
 
-object ConversionRateServiceImplSpec extends DefaultRunnableSpec with MockitoSugar{
-    import Helpers._
-    val rateRepositoryMock = mock[Repository]
-    val subject = new ConversionRateServiceImpl(rateRepositoryMock)
-    
-    def spec = suite("ConversionRateServiceImpl"){
-        suite("getAllRates"){
-            test("should return all rates"){
-                for{
-                    result <- ZIO.succeed("Yess")
-                } yield assert(result)(equalTo("Yess"))
-            }
-        }
-    }
-}
-
-class ConversionRateServiceImplSpec2 extends PlaySpec with GuiceOneAppPerSuite with MockitoSugar with ArgumentMatchersSugar{
+class ConversionRateServiceImplSpec extends PlaySpec with GuiceOneAppPerSuite with MockitoSugar with ArgumentMatchersSugar{
     import Helpers._
     import ZIOHelper._
+    import Repository._
     val rateRepositoryMock = mock[Repository]
     val subject = new ConversionRateServiceImpl(rateRepositoryMock)
     "getAllRates" must {
-        "return effect that gives all rates as provided by repository" in {
+        "return an effect that gives all rates as provided by repository" in {
             // setup mock results
+            reset(rateRepositoryMock)
             when(rateRepositoryMock.getAllRates()).thenReturn(ZIO.succeed(List(getSampleSavedRate())))
 
             // act
@@ -52,21 +35,64 @@ class ConversionRateServiceImplSpec2 extends PlaySpec with GuiceOneAppPerSuite w
             verify(rateRepositoryMock).getAllRates()
         }
 
-        "return effect that fails as repository faild to fetch" in {
+        "return an effect that fails as repository faild to fetch" in {
             // setup mock results
+            reset(rateRepositoryMock)
             when(rateRepositoryMock.getAllRates()).thenReturn(ZIO.fail(new Exception("Database is unreachable")))
 
+            // act and assure
+            an [Exception] must be thrownBy interpret(subject.getAllRates())
+        }
+    }
+
+    "saveRates" must {
+        "return an effect that passes given rate to repo" in {
+            // arrange 
+            val inputRates = List(getSampleRate())
+
+            // setup mock results
+            reset(rateRepositoryMock)
+            when(rateRepositoryMock.getRatesByTarget(argThat[Set[String]](_ => true))).thenReturn(ZIO.succeed(Seq.empty[Repository.SavedConversionRate]))
+            when(rateRepositoryMock.saveRates(argThat[List[SavedConversionRate]](x => x.length == 1 && x.head.source == inputRates(0).source)))
+                .thenAnswer(ZIO.succeed(List(getSampleSavedRate())))
+
             // act
-            //interpret(subject.getAllRates()) must throwA("Database is unreachable")
-            //(10 / 2) must throwA[Exception]
+            val effect = subject.saveRates(inputRates)
+            val result = interpret(effect)
 
             // assure
-            // result must have length 1
-            // verify(rateRepositoryMock).getAllRates()
+            result must have size 1
+            verify(rateRepositoryMock, times(1)).getRatesByTarget(Set(inputRates.head.target))
+            verify(rateRepositoryMock, times(1)).saveRates(argThat[List[SavedConversionRate]](x => x.length == 1 && x.head.source == inputRates(0).source))
+        }
+
+        "return an effect that fails due to overlapping rates" in {
+            // arrange 
+            val inputRates = List(getSampleRate())
+            val savedRates = Seq(getSampleSavedRate())
+
+            // setup mock results
+            reset(rateRepositoryMock)
+            when(rateRepositoryMock.getRatesByTarget(argThat[Set[String]](_ => true))).thenReturn(ZIO.succeed(savedRates))
+            when(rateRepositoryMock.saveRates(argThat[List[SavedConversionRate]](x => x.length == 1 && x.head.source == inputRates(0).source)))
+                .thenAnswer(ZIO.succeed(List(getSampleSavedRate())))
+
+            // act
+            val effect = subject.saveRates(inputRates)
+            val thrown = the [ValidationException] thrownBy interpret(effect)
+
+            // assure
+            thrown.message must include("Overlapping rates")
+            verify(rateRepositoryMock, times(1)).getRatesByTarget(Set(inputRates.head.target))
+            verify(rateRepositoryMock, times(0)).saveRates(argThat[List[SavedConversionRate]](x => true))
         }
     }
 
     private def getSampleSavedRate() : Repository.SavedConversionRate = {
-        Repository.SavedConversionRate(Some(1), "Kg", "Gm", new DateTime(), new DateTime(), 1000)
+        Repository.SavedConversionRate(Some(1), "Kg", "Gm", ConversionRateService.defaultStartDate, ConversionRateService.defaultEndDate, 1000)
     }
+
+    private def getSampleRate() : ConversionRate = 
+        ConversionRate("Kg", "Gm", None, None, 1000, None)
+    
 }
