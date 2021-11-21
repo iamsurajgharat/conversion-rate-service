@@ -19,6 +19,7 @@ import Repository._
 trait ConversionRateService{
     def saveRates(rates:List[ConversionRate]): Task[List[SavedConversionRate]]
     def getAllRates(): Task[List[SavedConversionRate]]
+    def getRates(requests:List[ConversionRateRequest]):Task[List[ConversionRateResponse]]
 }
 
 object ConversionRateService{
@@ -42,6 +43,22 @@ class ConversionRateServiceImpl @Inject() (repository:Repository) extends Conver
     
     def getAllRates(): Task[List[SavedConversionRate]] = 
         Repository.getAllRates().provideLayer(repoLayer)
+
+    def getRates(requests:List[ConversionRateRequest]):Task[List[ConversionRateResponse]] = {
+        val allUnits = requests.flatMap(x => List(x.source, x.target)).toSet
+        for{
+            savedRates <- repository.getRatesByTarget(allUnits)
+            rateGraph <- ZIO.attempt(RateGraph(savedRates))
+            res <- ZIO.foreach(requests)(x => {
+                val date = getRateDate(x.date)
+                val edges = rateGraph.getEdgesBetween(x.source, x.target, date)
+                val value = calculateValueFromEdges(edges)
+                ZIO.attempt(ConversionRateResponse(x.source, x.target, date, value.getOrElse(-1)))
+            })
+        } yield res
+    }
+
+    private def createGraph(rates:List[SavedConversionRate]):RateGraph = ???
 
     private def validateRate(rates: List[ConversionRate], 
         savedRates:Seq[SavedConversionRate]):IO[ValidationException, List[SavedConversionRate]] = {
@@ -76,6 +93,23 @@ class ConversionRateServiceImpl @Inject() (repository:Repository) extends Conver
             }
         }
         updatedSavedRates
+    }
+
+    private def calculateValueFromEdges(edges:List[RateGraphEdge]):Option[Float] = {
+        if(edges.isEmpty) None
+        else Some(edges.view.map(_.value).reduce((x,y) => x * y))
+    }
+
+    private def getRateDate(reqDate:Option[DateTime]):DateTime = reqDate.getOrElse(new DateTime())
+
+    case class RateGraphEdge(fromDate:DateTime, toDate:DateTime, target:String, value:Float)
+    case class RateGraphNode(unit:String, edges:Map[String,RateGraphEdge])
+    class RateGraph(nodes:Map[String, RateGraphNode]){
+        def getEdgesBetween(start:String, end:String, date:DateTime):List[RateGraphEdge] = ???
+    }
+
+    object RateGraph{
+        def apply(rates:Seq[SavedConversionRate]):RateGraph = ???
     }
 }
 
