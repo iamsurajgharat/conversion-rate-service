@@ -12,6 +12,7 @@ import org.scalatestplus.play.guice.GuiceOneAppPerSuite
 import play.api.test.Helpers
 import zio.ZIO
 import com.surajgharat.conversionrates.models.ConversionRate
+import com.surajgharat.conversionrates.models.ConversionRateRequest
 
 class ConversionRateServiceImplSpec extends PlaySpec with GuiceOneAppPerSuite with MockitoSugar with ArgumentMatchersSugar{
     import Helpers._
@@ -85,6 +86,56 @@ class ConversionRateServiceImplSpec extends PlaySpec with GuiceOneAppPerSuite wi
             thrown.message must include("Overlapping rates")
             verify(rateRepositoryMock, times(1)).getRatesByTarget(Set(inputRates.head.target))
             verify(rateRepositoryMock, times(0)).saveRates(argThat[List[SavedConversionRate]](x => true))
+        }
+    }
+
+    "getRates" must {
+        "return correct direct rate" in {
+            // arrange
+            val input = List(ConversionRateRequest("USD", "INR", Some(new DateTime(2021,1,15,0,0,0))))
+
+            reset(rateRepositoryMock)
+            when(rateRepositoryMock.getRatesByTarget(argThat[Set[String]](_ => true)))
+                .thenReturn(
+                    ZIO.succeed(
+                        Seq(
+                            SavedConversionRate(Some(1), "USD", "INR", new DateTime(2021,1,1,0,0,0), new DateTime(2021,1,31,0,0,0), 75)
+                        )
+                    )
+                )
+
+            // act
+            val effect = subject.getRates((input))
+            val result = interpret(effect)
+
+            // assure
+            result.head.rate mustBe 75
+
+        }
+
+        "return correct indirect rate" in {
+            // arrange
+            val input = List(
+                ConversionRateRequest("EUR", "INR", Some(new DateTime(2021,1,15,0,0,0)))
+            )
+
+            reset(rateRepositoryMock)
+            when(rateRepositoryMock.getRatesByTarget(argThat[Set[String]](_ => true)))
+                .thenReturn(
+                    ZIO.succeed(
+                        Seq(
+                            SavedConversionRate(Some(1), "USD", "INR", new DateTime(2021,1,1,0,0,0), new DateTime(2021,1,31,0,0,0), 75),
+                            SavedConversionRate(Some(1), "USD", "EUR", new DateTime(2021,1,1,0,0,0), new DateTime(2021,1,31,0,0,0), 0.5f)
+                        )
+                    )
+                )
+
+            // act
+            val effect = subject.getRates((input))
+            val result = interpret(effect)
+
+            // assure
+            result.head.rate mustBe 150f
         }
     }
 

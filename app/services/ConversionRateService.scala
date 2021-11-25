@@ -53,7 +53,7 @@ class ConversionRateServiceImpl @Inject() (repository:Repository) extends Conver
                 val date = getRateDate(x.date)
                 val edges = rateGraph.getEdgesBetween(x.source, x.target, date)
                 val value = calculateValueFromEdges(edges)
-                ZIO.attempt(ConversionRateResponse(x.source, x.target, date, value.getOrElse(-1)))
+                ZIO.succeed(ConversionRateResponse(x.source, x.target, date, value.getOrElse(-1)))
             })
         } yield res
     }
@@ -103,13 +103,45 @@ class ConversionRateServiceImpl @Inject() (repository:Repository) extends Conver
     private def getRateDate(reqDate:Option[DateTime]):DateTime = reqDate.getOrElse(new DateTime())
 
     case class RateGraphEdge(fromDate:DateTime, toDate:DateTime, target:String, value:Float)
-    case class RateGraphNode(unit:String, edges:Map[String,RateGraphEdge])
+    
+    case class RateGraphNode(unit:String, edges:Map[String,RateGraphEdge]){
+        def addEdge(edge:RateGraphEdge):RateGraphNode = RateGraphNode(unit, edges + (edge.target -> edge))
+    }
+
     class RateGraph(nodes:Map[String, RateGraphNode]){
-        def getEdgesBetween(start:String, end:String, date:DateTime):List[RateGraphEdge] = ???
+        def addRate(rate:SavedConversionRate):RateGraph = {
+            val node1 = nodes
+            .getOrElse(rate.source, RateGraphNode(rate.source, Map.empty[String, RateGraphEdge]))
+            .addEdge(RateGraphEdge(rate.fromDate, rate.toDate, rate.target, rate.value))
+            
+            val node2 = nodes
+            .getOrElse(rate.target, RateGraphNode(rate.target, Map.empty[String, RateGraphEdge]))
+            .addEdge(RateGraphEdge(rate.fromDate, rate.toDate, rate.source, 1/rate.value))
+            new RateGraph(nodes ++ List((rate.source -> node1), (rate.target -> node2)))
+        }
+
+        def getEdgesBetween(start:String, end:String, date:DateTime):List[RateGraphEdge] = {
+            if(!nodes.contains(start) || !nodes.contains(end)) Nil
+            else{
+                if(nodes(start).edges.contains(end)) List(nodes(start).edges(end))
+                else List(
+                    nodes(start).edges.head._2, 
+                    nodes(nodes(start).edges.head._1).edges(end)
+                )
+            }
+        }
     }
 
     object RateGraph{
-        def apply(rates:Seq[SavedConversionRate]):RateGraph = ???
+        def apply(rates:Seq[SavedConversionRate]):RateGraph = RateGraph(new RateGraph(Map.empty[String,RateGraphNode]), rates)
+        
+        private def apply(graph:RateGraph, rates:Seq[SavedConversionRate]):RateGraph = {
+            if(rates.isEmpty) graph
+            else{
+                val (head :: rest) = rates
+                RateGraph(graph.addRate(head), rest)
+            }
+        }
     }
 }
 
