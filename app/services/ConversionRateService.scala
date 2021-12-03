@@ -14,6 +14,7 @@ import zio.IO
 import zio.ZLayer
 
 import Repository._
+import akka.http.javadsl.model.headers.Date
 
 @ImplementedBy(classOf[ConversionRateServiceImpl])
 trait ConversionRateService{
@@ -102,20 +103,32 @@ class ConversionRateServiceImpl @Inject() (repository:Repository) extends Conver
 
     private def getRateDate(reqDate:Option[DateTime]):DateTime = reqDate.getOrElse(new DateTime())
 
-    case class RateGraphEdge(fromDate:DateTime, toDate:DateTime, target:String, value:Float)
+    case class RateGraphEdge(fromDate:DateTime, toDate:DateTime, target:String, value:Float){
+        import com.surajgharat.conversionrates.helpers.MyDate._
+        def isApplicable(date:DateTime):Boolean = date >= fromDate && date <= toDate
+        def reverse(newTarget:String):RateGraphEdge = RateGraphEdge(fromDate, toDate, newTarget, 1/value)
+    }
     
-    case class RateGraphNode(unit:String, edges:Map[String,RateGraphEdge]){
-        def addEdge(edge:RateGraphEdge):RateGraphNode = RateGraphNode(unit, edges + (edge.target -> edge))
+    case class RateGraphNode(unit:String, edges:Map[String,List[RateGraphEdge]]){
+        def addEdge(edge:RateGraphEdge):RateGraphNode = {
+            val finalEdges = edge :: edges.getOrElse(edge.target, List.empty[RateGraphEdge])
+            RateGraphNode(unit, edges + (edge.target -> finalEdges))
+        }
+
+        def getEdge(target:String, date:DateTime):Option[RateGraphEdge] = {
+            if(!edges.contains(target)) None 
+            else edges(target).find(_.isApplicable(date))
+        }
     }
 
     class RateGraph(nodes:Map[String, RateGraphNode]){
         def addRate(rate:SavedConversionRate):RateGraph = {
             val node1 = nodes
-            .getOrElse(rate.source, RateGraphNode(rate.source, Map.empty[String, RateGraphEdge]))
+            .getOrElse(rate.source, RateGraphNode(rate.source, Map.empty[String, List[RateGraphEdge]]))
             .addEdge(RateGraphEdge(rate.fromDate, rate.toDate, rate.target, rate.value))
             
             val node2 = nodes
-            .getOrElse(rate.target, RateGraphNode(rate.target, Map.empty[String, RateGraphEdge]))
+            .getOrElse(rate.target, RateGraphNode(rate.target, Map.empty[String, List[RateGraphEdge]]))
             .addEdge(RateGraphEdge(rate.fromDate, rate.toDate, rate.source, 1/rate.value))
             new RateGraph(nodes ++ List((rate.source -> node1), (rate.target -> node2)))
         }
@@ -123,11 +136,15 @@ class ConversionRateServiceImpl @Inject() (repository:Repository) extends Conver
         def getEdgesBetween(start:String, end:String, date:DateTime):List[RateGraphEdge] = {
             if(!nodes.contains(start) || !nodes.contains(end)) Nil
             else{
-                if(nodes(start).edges.contains(end)) List(nodes(start).edges(end))
-                else List(
-                    nodes(start).edges.head._2, 
-                    nodes(nodes(start).edges.head._1).edges(end)
-                )
+                if(nodes(start).edges.contains(end)) 
+                    nodes(start).getEdge(end, date).fold[List[RateGraphEdge]](Nil)(List(_))
+                else {
+                    val intNode = nodes(start).edges.head._1
+                    (nodes(intNode).getEdge(start, date), nodes(intNode).getEdge(end, date)) match {
+                        case (Some(e1), Some(e2)) => List(e1.reverse(intNode), e2)
+                        case (_,_) => Nil
+                    }
+                }
             }
         }
     }

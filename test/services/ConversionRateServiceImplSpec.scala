@@ -113,6 +113,30 @@ class ConversionRateServiceImplSpec extends PlaySpec with GuiceOneAppPerSuite wi
 
         }
 
+        "return correct direct rate for given date" in {
+            // arrange
+            val input = List(ConversionRateRequest("USD", "INR", Some(new DateTime(2021,1,15,0,0,0))))
+
+            reset(rateRepositoryMock)
+            when(rateRepositoryMock.getRatesByTarget(argThat[Set[String]](_ => true)))
+                .thenReturn(
+                    ZIO.succeed(
+                        Seq(
+                            SavedConversionRate(Some(1), "USD", "INR", new DateTime(2021,1,1,0,0,0), new DateTime(2021,1,31,0,0,0), 75),
+                            SavedConversionRate(Some(1), "USD", "INR", new DateTime(2021,2,1,0,0,0), new DateTime(2021,2,28,0,0,0), 80)
+                        )
+                    )
+                )
+
+            // act
+            val effect = subject.getRates((input))
+            val result = interpret(effect)
+
+            // assure
+            result.head.rate mustBe 75
+
+        }
+
         "return correct indirect rate" in {
             // arrange
             val input = List(

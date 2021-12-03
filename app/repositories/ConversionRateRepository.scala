@@ -36,18 +36,9 @@ object Repository{
         value:Float
     ){
         def overlap(that:SavedConversionRate):Boolean = {
+            import helpers.MyDate._
             if (this.fromDate <= that.fromDate) that.fromDate >= this.fromDate && that.fromDate <= this.toDate
             else this.fromDate >= that.fromDate && this.fromDate <= that.toDate
-        }
-
-        implicit def toMyDate(value:DateTime):MyDate = new MyDate(value)
-        class MyDate(dateTime:DateTime){
-            private val date = dateTime.toDate()
-            def <(that:MyDate):Boolean = this.date.before(that.date)
-            def ==(that:MyDate):Boolean = this.date.equals(that.date)
-            def <=(that:MyDate):Boolean = this < that || this == that
-            def >(that:MyDate):Boolean = this.date.after(that.date)
-            def >=(that:MyDate):Boolean = this > that || this == that
         }
     }
 
