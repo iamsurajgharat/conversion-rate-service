@@ -36,7 +36,7 @@ class ConversionRateControllerSpec extends PlaySpec with GuiceOneAppPerSuite wit
             // mock result data
             when(rateServiceMock.getAllRates()).
                 thenReturn(
-                    ZIO.succeed(List(getSampleSavedRate()))
+                    ZIO.succeed(List(ConversionRate(getSampleSavedRate())))
                 )
 
             // act
@@ -45,7 +45,7 @@ class ConversionRateControllerSpec extends PlaySpec with GuiceOneAppPerSuite wit
             // assure
             status(result) mustBe OK
             val jsValue = Json.parse(contentAsString(result))
-            jsValue.validate[List[SavedConversionRate]] match {
+            jsValue.validate[List[ConversionRate]] match {
                 case JsSuccess(data, _) =>
                     data must have size 1
                 case _:JsError => 
@@ -85,7 +85,8 @@ class ConversionRateControllerSpec extends PlaySpec with GuiceOneAppPerSuite wit
                 thenReturn(
                     ZIO.succeed(
                     List(
-                        SavedConversionRate(Some(1), rates.head.source, rates.head.target, new DateTime(2021,1,1,0,0,0), new DateTime(2021,1,31,0,0,0), 45)))
+                        ConversionRate(rates.head.source, rates.head.target, Some(new DateTime(2021,1,1,0,0,0)), 
+                                        Some(new DateTime(2021,1,31,0,0,0)), 45, Some(1))))
                 )
 
             // act
@@ -94,7 +95,7 @@ class ConversionRateControllerSpec extends PlaySpec with GuiceOneAppPerSuite wit
             // assure
             status(result) mustBe OK
             val jsValue = Json.parse(contentAsString(result))
-            jsValue.validate[List[SavedConversionRate]] match {
+            jsValue.validate[List[ConversionRate]] match {
                 case JsSuccess(data, _) =>
                     data.head.source mustBe rates.head.source
                 case _:JsError => 
