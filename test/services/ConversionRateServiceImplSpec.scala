@@ -137,6 +137,28 @@ class ConversionRateServiceImplSpec extends PlaySpec with GuiceOneAppPerSuite wi
 
         }
 
+        "return undefined value when rate not configured" in {
+            // arrange
+            val input = List(ConversionRateRequest("USD", "INR", Some(new DateTime(2021,1,15,0,0,0))))
+
+            reset(rateRepositoryMock)
+            when(rateRepositoryMock.getRatesByTarget(argThat[Set[String]](_ => true)))
+                .thenReturn(
+                    ZIO.succeed(
+                        Seq(
+                        )
+                    )
+                )
+
+            // act
+            val effect = subject.getRates((input))
+            val result = interpret(effect)
+
+            // assure
+            result.head.rate mustBe ConversionRateService.ValueForUndefinedRate
+
+        }
+
         "return correct indirect rate" in {
             // arrange
             val input = List(
@@ -160,6 +182,33 @@ class ConversionRateServiceImplSpec extends PlaySpec with GuiceOneAppPerSuite wi
 
             // assure
             result.head.rate mustBe 150f
+        }
+
+        "return correct indirect rate for given date" in {
+            // arrange
+            val input = List(
+                ConversionRateRequest("EUR", "INR", Some(new DateTime(2021,2,15,0,0,0)))
+            )
+
+            reset(rateRepositoryMock)
+            when(rateRepositoryMock.getRatesByTarget(argThat[Set[String]](_ => true)))
+                .thenReturn(
+                    ZIO.succeed(
+                        Seq(
+                            SavedConversionRate(Some(1), "USD", "INR", new DateTime(2021,1,1,0,0,0), new DateTime(2021,1,31,0,0,0), 75),
+                            SavedConversionRate(Some(1), "USD", "EUR", new DateTime(2021,1,1,0,0,0), new DateTime(2021,1,31,0,0,0), 0.5f),
+                            SavedConversionRate(Some(1), "USD", "INR", new DateTime(2021,2,1,0,0,0), new DateTime(2021,2,28,0,0,0), 80),
+                            SavedConversionRate(Some(1), "USD", "EUR", new DateTime(2021,2,1,0,0,0), new DateTime(2021,2,28,0,0,0), 0.2f)
+                        )
+                    )
+                )
+
+            // act
+            val effect = subject.getRates((input))
+            val result = interpret(effect)
+
+            // assure
+            result.head.rate mustBe 400f
         }
     }
 

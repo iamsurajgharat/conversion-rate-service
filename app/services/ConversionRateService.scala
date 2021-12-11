@@ -18,32 +18,34 @@ import akka.http.javadsl.model.headers.Date
 
 @ImplementedBy(classOf[ConversionRateServiceImpl])
 trait ConversionRateService{
-    def saveRates(rates:List[ConversionRate]): Task[List[SavedConversionRate]]
-    def getAllRates(): Task[List[SavedConversionRate]]
+    def saveRates(rates:List[ConversionRate]): Task[List[ConversionRate]]
+    def getAllRates(): Task[List[ConversionRate]]
     def getRates(requests:List[ConversionRateRequest]):Task[List[ConversionRateResponse]]
 }
 
 object ConversionRateService{
     val defaultStartDate = new DateTime(1, 1, 1, 0, 0)
     val defaultEndDate = new DateTime(4000, 12, 31, 0, 0)
+    val ValueForUndefinedRate = -1f;
 }
 
 @inject.Singleton
 class ConversionRateServiceImpl @Inject() (repository:Repository) extends ConversionRateService{
     val repoLayer: ULayer[Has[Repository]] = ZLayer.succeed(repository)
-    def saveRates(rates: List[ConversionRate]): Task[List[SavedConversionRate]] = {
+    def saveRates(rates: List[ConversionRate]): Task[List[ConversionRate]] = {
         // find overlaps if any
         val savedRatesEffect = for{
             oldSavedRates <- Repository.getRatesByTarget(rates.map(_.target).toSet)
             validatedRates <- validateRate(rates, oldSavedRates)
             savedRates <- Repository.saveRates(validatedRates)
-        } yield savedRates
+            rates <- mapToWebModel(savedRates)
+        } yield rates
         
         savedRatesEffect.provideLayer(repoLayer)
     }
     
-    def getAllRates(): Task[List[SavedConversionRate]] = 
-        Repository.getAllRates().provideLayer(repoLayer)
+    def getAllRates(): Task[List[ConversionRate]] = 
+        Repository.getAllRates().map(x => x.map(ConversionRate(_))).provideLayer(repoLayer)
 
     def getRates(requests:List[ConversionRateRequest]):Task[List[ConversionRateResponse]] = {
         val allUnits = requests.flatMap(x => List(x.source, x.target)).toSet
@@ -54,12 +56,16 @@ class ConversionRateServiceImpl @Inject() (repository:Repository) extends Conver
                 val date = getRateDate(x.date)
                 val edges = rateGraph.getEdgesBetween(x.source, x.target, date)
                 val value = calculateValueFromEdges(edges)
-                ZIO.succeed(ConversionRateResponse(x.source, x.target, date, value.getOrElse(-1)))
+                ZIO.succeed(ConversionRateResponse(x.source, x.target, date, value.getOrElse(ConversionRateService.ValueForUndefinedRate)))
             })
         } yield res
     }
 
     private def createGraph(rates:List[SavedConversionRate]):RateGraph = ???
+
+    private def mapToWebModel(savedRates:List[SavedConversionRate]) = ZIO.attempt{
+        savedRates.map[ConversionRate](ConversionRate(_))
+    }
 
     private def validateRate(rates: List[ConversionRate], 
         savedRates:Seq[SavedConversionRate]):IO[ValidationException, List[SavedConversionRate]] = {

@@ -26,7 +26,7 @@ trait Repository {
 }
 
 object Repository{
-    import com.surajgharat.conversionrates.models.ConversionRate._
+    import com.surajgharat.conversionrates.models.BaseResponse._
     case class SavedConversionRate(
         id:Option[Int],
         source:String,

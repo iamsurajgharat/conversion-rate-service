@@ -4,7 +4,11 @@ import play.api.libs.json._
 import org.joda.time.DateTime
 import com.surajgharat.conversionrates.repositories.Repository
 
-object ConversionRate {
+sealed trait BaseResponse{
+  val s1 = 10
+}
+
+object BaseResponse {
   implicit val dateTimeWrites = new Writes[DateTime] {
     def writes(date: DateTime) = {
       JsString(
@@ -32,20 +36,23 @@ object ConversionRate {
   implicit val requestFormat = Json.format[ConversionRateRequest]
   implicit val responseFormat = Json.format[ConversionRateResponse]
   implicit val rateFormat = Json.format[ConversionRate]
+  implicit val baseResponseFormat = Json.format[BaseResponse]
+
+  //def toJsValue[T <: ConversionRateRequest](value:T) : JsValue = Json.toJson(value)
 }
 
 case class ConversionRateRequest(
     source: String,
     target: String,
     date: Option[DateTime]
-)
+) extends BaseResponse
 
 case class ConversionRateResponse(
     source: String,
     target: String,
     date: DateTime,
     rate: Float
-)
+) extends BaseResponse
 
 
 case class ConversionRate(source: String,
@@ -54,7 +61,12 @@ case class ConversionRate(source: String,
     endDate: Option[DateTime],
     rate: Float,
     id:Option[Int]
-    ){
+    ) extends BaseResponse{
       def toSavedRate(sd:DateTime, ed:DateTime):Repository.SavedConversionRate = 
         Repository.SavedConversionRate(id, source, target, startDate.getOrElse(sd), endDate.getOrElse(ed), rate)
     }
+
+object ConversionRate{
+  def apply(savedRate:Repository.SavedConversionRate) : ConversionRate = 
+    ConversionRate(savedRate.source, savedRate.target, Some(savedRate.fromDate), Some(savedRate.toDate), savedRate.value, savedRate.id)
+}

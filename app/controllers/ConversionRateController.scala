@@ -23,7 +23,7 @@ class ConversionRateController @Inject() (
         val controllerComponents: ControllerComponents
     ) extends BaseController {
         
-    import ConversionRate._
+    import BaseResponse._
     import Repository._
     import ZIOHelper._
     implicit val ec = controllerComponents.executionContext
@@ -39,10 +39,25 @@ class ConversionRateController @Inject() (
             BadRequest(Json.obj("errors" -> JsError.toJson(errors)))
 
         def success(request:List[ConversionRateRequest]) : Result = {
+            rateService.getRates(request)
             Ok(Json.toJson(request.map(r => ConversionRateResponse(r.source, r.target, r.date.getOrElse(time.DateTime.now()), 234))))
         }
 
         request.body.validate[List[ConversionRateRequest]].fold(error, success);
+    }
+
+    def getRates2() = zioActionWithBody { request => 
+        def validateError(errors: scala.collection.Seq[(JsPath, scala.collection.Seq[JsonValidationError])]) : UIO[Result] = {
+            val validationError = ZIO.attempt(Json.obj("errors" -> JsError.toJson(errors))).
+                orElse(ZIO.succeed(Json.obj("errors" -> "Error in parsing input")))
+            validationError.map(BadRequest(_))
+        }
+
+        def validateSuccess(request:List[ConversionRateRequest]) : UIO[Result] = {
+            rateService.getRates(request).fold(handleInternalError, handleSuccess)
+        }
+
+        request.body.validate[List[ConversionRateRequest]].fold(validateError, validateSuccess)
     }
 
     def getAllRates() = zioAction { _ =>
@@ -80,5 +95,17 @@ class ConversionRateController @Inject() (
         case _ : ValidationException => BadRequest(e.getMessage())
         case _ => InternalServerError(e.getMessage())
     }
-    private def handleSuccess(data:List[SavedConversionRate]):Result = Ok(Json.toJson(data))
+
+    //import ai.x.play.json.Jsonx
+    private def handleSuccess[T <: BaseResponse](data:List[T]):Result = Ok(toJson(data))
+
+    private def toJson[T <: BaseResponse](data : List[T]):JsValue = JsArray(data.map(toJson(_)))
+    
+    private def toJson[T <: BaseResponse](data : T) : JsValue = data match {
+        case req : ConversionRateRequest => Json.toJson(req)
+        case res : ConversionRateResponse => Json.toJson(res)
+        case rate : ConversionRate => Json.toJson(rate)
+    }
 }
+
+
