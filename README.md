@@ -12,3 +12,8 @@ test:compile
 ## Run some test cases
 
 testOnly com.surajgharat.conversionrates.*
+
+## psql command for local dockerized postgresql
+
+psql -h localhost -p 5432 -U postgres
+

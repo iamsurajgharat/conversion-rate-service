@@ -33,20 +33,7 @@ class ConversionRateController @Inject() (
         Ok("All is well")
     }
     
-    def getRates() = Action(parse.json) { request: Request[JsValue] =>
-        logger.trace("getRates request hit")
-        def error(errors: scala.collection.Seq[(JsPath, scala.collection.Seq[JsonValidationError])]) = 
-            BadRequest(Json.obj("errors" -> JsError.toJson(errors)))
-
-        def success(request:List[ConversionRateRequest]) : Result = {
-            rateService.getRates(request)
-            Ok(Json.toJson(request.map(r => ConversionRateResponse(r.source, r.target, r.date.getOrElse(time.DateTime.now()), 234))))
-        }
-
-        request.body.validate[List[ConversionRateRequest]].fold(error, success);
-    }
-
-    def getRates2() = zioActionWithBody { request => 
+    def getRates() = zioActionWithBody { request => 
         def validateError(errors: scala.collection.Seq[(JsPath, scala.collection.Seq[JsonValidationError])]) : UIO[Result] = {
             val validationError = ZIO.attempt(Json.obj("errors" -> JsError.toJson(errors))).
                 orElse(ZIO.succeed(Json.obj("errors" -> "Error in parsing input")))
@@ -93,14 +80,16 @@ class ConversionRateController @Inject() (
     //private def interpret(effect: UIO[Result]):Result = zio.Runtime.default.unsafeRunTask(effect)
     private def handleInternalError(e:Throwable):Result = e match {
         case _ : ValidationException => BadRequest(e.getMessage())
-        case _ => InternalServerError(e.getMessage())
+        case _ => 
+            //e.printStackTrace()
+            InternalServerError(e.getMessage())
     }
 
     //import ai.x.play.json.Jsonx
     private def handleSuccess[T <: BaseResponse](data:List[T]):Result = Ok(toJson(data))
 
     private def toJson[T <: BaseResponse](data : List[T]):JsValue = JsArray(data.map(toJson(_)))
-    
+
     private def toJson[T <: BaseResponse](data : T) : JsValue = data match {
         case req : ConversionRateRequest => Json.toJson(req)
         case res : ConversionRateResponse => Json.toJson(res)

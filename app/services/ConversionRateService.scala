@@ -161,8 +161,8 @@ class ConversionRateServiceImpl @Inject() (repository:Repository) extends Conver
         private def apply(graph:RateGraph, rates:Seq[SavedConversionRate]):RateGraph = {
             if(rates.isEmpty) graph
             else{
-                val (head :: rest) = rates
-                RateGraph(graph.addRate(head), rest)
+                val (head :: rest) = rates.toList
+                this(graph.addRate(head), rest)
             }
         }
     }
