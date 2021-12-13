@@ -37,6 +37,11 @@ lazy val root = (project in file("."))
     flywayBaselineOnMigrate := true
   )
 
+import com.typesafe.sbt.packager.docker.DockerChmodType
+import com.typesafe.sbt.packager.docker.DockerPermissionStrategy
+dockerChmodType := DockerChmodType.UserGroupWriteExecute
+dockerPermissionStrategy := DockerPermissionStrategy.CopyChown
+
 
 // Adds additional packages into Twirl
 //TwirlKeys.templateImports += "com.surajgharat.controllers._"

@@ -77,11 +77,8 @@ class ConversionRateServiceImpl @Inject() (repository:Repository) extends Conver
             savedRatesByTarget.get(newRate._1.target).getOrElse(Nil).view.exists(sr => (newRate._1.id == None ||(newRate._1.id.get != sr.id.get)) && sr.overlap(newRate._1))
         })
 
-        if(validInvalidRates._1.isEmpty){
-            val validRates = validInvalidRates._2.map(_._1)
-            ZIO.succeed(validRates)
-        }
-        else{
+        if (validInvalidRates._1.isEmpty) ZIO.succeed(validInvalidRates._2.map(_._1))        
+        else {
             val invalidIndices = validInvalidRates._1.map(_._2)
             val message = s"Overlapping rates [${invalidIndices.mkString(",")}]"
             ZIO.fail(new ValidationException(message))
